@@ -5,8 +5,14 @@ from game_mode import GameMode, ComboLevel, GameConfig
 class Board:
     WIDTH = 4
     HEIGHT = 8
+    MIN_WIDTH = 20
+    MIN_HEIGHT = 15
 
-    def __init__(self, game_mode=GameMode.INFINITE):
+    def __init__(self, game_mode=GameMode.INFINITE, window_height=24, window_width=40):
+        self.window_height = window_height
+        self.window_width = window_width
+        self.column_width = 4
+        self.visible_rows = 8
         self.grid = [[0] * self.WIDTH for _ in range(self.HEIGHT)]
         self.score = 0
         self.game_over = False
@@ -16,7 +22,26 @@ class Board:
         self.combo_level = ComboLevel.NORMAL
         self.time_remaining = GameConfig.TIMED_MODE_DURATION
         self.show_mistake = False
+        self.calculate_layout()
         self._init_board()
+
+    def calculate_layout(self):
+        self.column_width = max(2, (self.window_width - 5) // 4)
+        self.visible_rows = 8
+        self.row_height = max(1, (self.window_height - 13) // 8)
+
+    def is_window_too_small(self):
+        is_too_small = self.window_width < self.MIN_WIDTH or self.window_height < self.MIN_HEIGHT
+        if is_too_small:
+            message = f"窗口太小！最小尺寸: {self.MIN_WIDTH}x{self.MIN_HEIGHT}，当前: {self.window_width}x{self.window_height}"
+        else:
+            message = ""
+        return (is_too_small, message)
+
+    def update_window_size(self, height, width):
+        self.window_height = height
+        self.window_width = width
+        self.calculate_layout()
 
     def _init_board(self):
         for row in range(self.HEIGHT):
@@ -76,28 +101,37 @@ class Board:
 
     def render(self):
         lines = []
-        lines.append("+" + "+".join(["----"] * self.WIDTH) + "+")
-        
+        cw = self.column_width
+        rh = self.row_height
+        border = "+" + "+".join(["-" * cw] * self.WIDTH) + "+"
+        black_block = "█" * cw
+        empty_block = " " * cw
+        keys = ["D", "F", "J", "K"]
+
+        lines.append(border)
+
         for row in range(self.HEIGHT):
-            row_display = []
-            for col in range(self.WIDTH):
-                if self.grid[row][col] == 1:
-                    row_display.append("████")
-                else:
-                    row_display.append("    ")
-            lines.append("|" + "|".join(row_display) + "|")
-            lines.append("+" + "+".join(["----"] * self.WIDTH) + "+")
-        
-        lines.append("|" + "|".join([" D  ", " F  ", " J  ", " K  "]) + "|")
-        lines.append("+" + "+".join(["----"] * self.WIDTH) + "+")
-        
+            for _ in range(rh):
+                row_display = []
+                for col in range(self.WIDTH):
+                    if self.grid[row][col] == 1:
+                        row_display.append(black_block)
+                    else:
+                        row_display.append(empty_block)
+                lines.append("|" + "|".join(row_display) + "|")
+            lines.append(border)
+
+        key_cells = [key.center(cw) for key in keys]
+        lines.append("|" + "|".join(key_cells) + "|")
+        lines.append(border)
+
         if self.game_mode == GameMode.INFINITE:
-            lines.append(f"\nScore: {self.score}")
+            lines.append(f"Score: {self.score}")
         else:
             combo_level_name = self.combo_level.name.capitalize()
-            status = f"\nScore: {self.score}  Combo: {self.combo} ({combo_level_name})  Time: {self.time_remaining}s"
+            status = f"Score: {self.score}  Combo: {self.combo} ({combo_level_name})  Time: {self.time_remaining}s"
             if self.show_mistake:
                 status += "  Oops!"
             lines.append(status)
-        
+
         return "\n".join(lines)

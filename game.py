@@ -63,14 +63,31 @@ def safe_addstr(stdscr, y, x, text):
 
 
 def run_game(stdscr, game_mode):
-    board = Board(game_mode)
+    height, width = stdscr.getmaxyx()
+    board = Board(game_mode, height, width)
     handler = InputHandler(stdscr)
     start_time = time.time()
     
     while not board.game_over:
+        height, width = stdscr.getmaxyx()
+        is_too_small, small_message = board.is_window_too_small()
+        
         stdscr.clear()
-        safe_addstr(stdscr, 0, 0, board.render())
+        if is_too_small:
+            safe_addstr(stdscr, 0, 0, small_message)
+        else:
+            safe_addstr(stdscr, 0, 0, board.render())
         stdscr.refresh()
+        
+        if is_too_small:
+            key = stdscr.getch()
+            if key == ord('q') or key == ord('Q'):
+                break
+            if key == curses.KEY_RESIZE:
+                height, width = stdscr.getmaxyx()
+                board.update_window_size(height, width)
+            time.sleep(0.02)
+            continue
         
         if game_mode == GameMode.TIMED:
             board.time_remaining = max(0, GameConfig.TIMED_MODE_DURATION - int(time.time() - start_time))
@@ -81,6 +98,11 @@ def run_game(stdscr, game_mode):
         if key == ord('q') or key == ord('Q'):
             break
         
+        if key == curses.KEY_RESIZE:
+            height, width = stdscr.getmaxyx()
+            board.update_window_size(height, width)
+            continue
+        
         col = handler.key_to_column(key)
         if col != -1:
             board.tap_column(col)
@@ -88,18 +110,20 @@ def run_game(stdscr, game_mode):
         time.sleep(0.02)
     
     stdscr.clear()
-    safe_addstr(stdscr, 0, 0, board.render())
+    stdscr.refresh()
     
-    info_row = board.HEIGHT * 2 + 4
+    height, width = stdscr.getmaxyx()
+    center_y = height // 2 - 2
+    
     if game_mode == GameMode.INFINITE:
-        safe_addstr(stdscr, info_row, 0, "Game Over!")
-        safe_addstr(stdscr, info_row + 1, 0, f"Final Score: {board.score}")
-        safe_addstr(stdscr, info_row + 3, 0, "按 R 重新开始，按 Q 退出")
+        safe_addstr(stdscr, center_y, 0, "Game Over!")
+        safe_addstr(stdscr, center_y + 1, 0, f"Final Score: {board.score}")
+        safe_addstr(stdscr, center_y + 3, 0, "按 R 重新开始，按 Q 退出")
     else:
-        safe_addstr(stdscr, info_row, 0, "Time's Up!")
-        safe_addstr(stdscr, info_row + 1, 0, f"Final Score: {board.score}")
-        safe_addstr(stdscr, info_row + 2, 0, f"Max Combo: {board.max_combo}")
-        safe_addstr(stdscr, info_row + 4, 0, "按 R 重新开始，按 Q 退出")
+        safe_addstr(stdscr, center_y, 0, "Time's Up!")
+        safe_addstr(stdscr, center_y + 1, 0, f"Final Score: {board.score}")
+        safe_addstr(stdscr, center_y + 2, 0, f"Max Combo: {board.max_combo}")
+        safe_addstr(stdscr, center_y + 4, 0, "按 R 重新开始，按 Q 退出")
     
     stdscr.nodelay(False)
     while True:
