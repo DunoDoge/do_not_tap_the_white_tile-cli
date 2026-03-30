@@ -8,7 +8,7 @@ class Board:
     MIN_WIDTH = 20
     MIN_HEIGHT = 15
 
-    def __init__(self, game_mode=GameMode.INFINITE, window_height=24, window_width=40):
+    def __init__(self, game_mode=GameMode.INFINITE, window_height=24, window_width=40, sound_manager=None):
         self.window_height = window_height
         self.window_width = window_width
         self.column_width = 4
@@ -22,6 +22,7 @@ class Board:
         self.combo_level = ComboLevel.NORMAL
         self.time_remaining = GameConfig.TIMED_MODE_DURATION
         self.show_mistake = False
+        self.sound_manager = sound_manager
         self.calculate_layout()
         self._init_board()
 
@@ -83,6 +84,8 @@ class Board:
             self.show_mistake = False
             self._shift_down()
             self._generate_row_at(0)
+            if self.sound_manager:
+                self.sound_manager.play_piano_note()
             return True
         else:
             if self.game_mode == GameMode.INFINITE:
@@ -92,6 +95,8 @@ class Board:
                 self.combo_level = ComboLevel.NORMAL
                 self.score = max(0, self.score - GameConfig.MISTAKE_PENALTY)
                 self.show_mistake = True
+            if self.sound_manager:
+                self.sound_manager.play_error_sound()
             return False
 
     def _shift_down(self):

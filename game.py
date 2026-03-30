@@ -3,6 +3,7 @@ import time
 from board import Board
 from player import InputHandler
 from game_mode import GameMode, GameConfig
+from sound_manager import SoundManager
 
 
 ASCII_TITLE = [
@@ -133,7 +134,8 @@ def safe_addstr(stdscr, y, x, text):
 
 def run_game(stdscr, game_mode):
     height, width = stdscr.getmaxyx()
-    board = Board(game_mode, height, width)
+    sound_manager = SoundManager()
+    board = Board(game_mode, height, width, sound_manager)
     handler = InputHandler(stdscr)
     start_time = time.time()
     
