@@ -4,6 +4,7 @@ from board import Board
 from player import InputHandler
 from game_mode import GameMode, GameConfig
 from sound_manager import SoundManager
+from score_manager import ScoreManager
 
 
 ASCII_TITLE = [
@@ -82,6 +83,76 @@ def show_rules(stdscr):
     stdscr.getch()
 
 
+def show_leaderboard(stdscr):
+    score_manager = ScoreManager()
+    
+    while True:
+        stdscr.clear()
+        height, width = stdscr.getmaxyx()
+        
+        menu_lines = [
+            "========== 排行榜 ==========",
+            "",
+            "[1] 无限模式排行榜",
+            "[2] 限时模式排行榜",
+            "[其他键] 返回",
+        ]
+        
+        draw_centered_lines(stdscr, menu_lines)
+        stdscr.refresh()
+        
+        stdscr.nodelay(False)
+        key = stdscr.getch()
+        
+        if key == ord('1'):
+            _display_leaderboard(stdscr, score_manager, "infinite")
+        elif key == ord('2'):
+            _display_leaderboard(stdscr, score_manager, "timed")
+        else:
+            return
+
+
+def _display_leaderboard(stdscr, score_manager, mode):
+    stdscr.clear()
+    height, width = stdscr.getmaxyx()
+    
+    top_scores = score_manager.get_top_scores(mode, limit=10)
+    
+    if mode == "infinite":
+        title = "无限模式排行榜"
+        header = "排名  分数    日期"
+    else:
+        title = "限时模式排行榜"
+        header = "排名  分数    连击    日期"
+    
+    lines = [
+        f"========== {title} ==========",
+        "",
+        header,
+    ]
+    
+    if not top_scores:
+        lines.append("")
+        lines.append("暂无记录")
+    else:
+        for i, record in enumerate(top_scores, 1):
+            if mode == "infinite":
+                line = f" {i:<4} {record.score:<6} {record.timestamp}"
+            else:
+                line = f" {i:<4} {record.score:<6} {record.max_combo:<6} {record.timestamp}"
+            lines.append(line)
+    
+    lines.append("")
+    lines.append(f"========== {title} ==========")
+    lines.append("按任意键返回...")
+    
+    draw_centered_lines(stdscr, lines)
+    stdscr.refresh()
+    
+    stdscr.nodelay(False)
+    stdscr.getch()
+
+
 def select_mode(stdscr):
     curses.curs_set(0)
     
@@ -94,6 +165,7 @@ def select_mode(stdscr):
             "[1] 无限模式",
             "[2] 限时模式",
             "[R] 规则说明",
+            "[L] 排行榜",
             "[Q] 退出游戏",
         ]
         
@@ -113,6 +185,8 @@ def select_mode(stdscr):
             return GameMode.TIMED
         elif key == ord('r') or key == ord('R'):
             show_rules(stdscr)
+        elif key == ord('l') or key == ord('L'):
+            show_leaderboard(stdscr)
         elif key == ord('q') or key == ord('Q'):
             return None
 
@@ -135,6 +209,7 @@ def safe_addstr(stdscr, y, x, text):
 def run_game(stdscr, game_mode):
     height, width = stdscr.getmaxyx()
     sound_manager = SoundManager()
+    score_manager = ScoreManager()
     board = Board(game_mode, height, width, sound_manager)
     handler = InputHandler(stdscr)
     start_time = time.time()
@@ -190,11 +265,13 @@ def run_game(stdscr, game_mode):
         safe_addstr(stdscr, center_y, 0, "Game Over!")
         safe_addstr(stdscr, center_y + 1, 0, f"Final Score: {board.score}")
         safe_addstr(stdscr, center_y + 3, 0, "按 R 重新开始，按 Q 退出")
+        score_manager.add_score(board.score, "infinite")
     else:
         safe_addstr(stdscr, center_y, 0, "Time's Up!")
         safe_addstr(stdscr, center_y + 1, 0, f"Final Score: {board.score}")
         safe_addstr(stdscr, center_y + 2, 0, f"Max Combo: {board.max_combo}")
         safe_addstr(stdscr, center_y + 4, 0, "按 R 重新开始，按 Q 退出")
+        score_manager.add_score(board.score, "timed", board.max_combo)
     
     stdscr.nodelay(False)
     while True:
