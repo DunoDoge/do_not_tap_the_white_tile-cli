@@ -4,6 +4,7 @@ from enum import Enum
 class GameMode(Enum):
     INFINITE = 1
     TIMED = 2
+    CHALLENGE = 3
 
 
 class ComboLevel(Enum):
@@ -18,3 +19,7 @@ class GameConfig:
     COMBO_THRESHOLDS = {10: ComboLevel.GOOD, 20: ComboLevel.GREAT, 50: ComboLevel.EXCELLENT}
     COMBO_MULTIPLIERS = {ComboLevel.NORMAL: 1, ComboLevel.GOOD: 1.5, ComboLevel.GREAT: 2, ComboLevel.EXCELLENT: 2.5}
     MISTAKE_PENALTY = 10
+    CHALLENGE_INITIAL_SPEED = 1.0
+    CHALLENGE_SPEED_INCREMENT = 0.02
+    CHALLENGE_MIN_SPEED = 0.1
+    CHALLENGE_SPAWN_INTERVAL = 1.5

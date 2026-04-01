@@ -72,6 +72,11 @@ def show_rules(stdscr):
         "连击可获得加分倍率",
         "失误扣分并中断连击",
         "",
+        "【挑战模式】",
+        "  黑键从顶端下落",
+        "点击底部黑键得分",
+        "黑键逃脱游戏结束",
+        "",
         "========== 游戏规则 ==========",
         "按任意键返回...",
     ]
@@ -95,6 +100,7 @@ def show_leaderboard(stdscr):
             "",
             "[1] 无限模式排行榜",
             "[2] 限时模式排行榜",
+            "[3] 挑战模式排行榜",
             "[其他键] 返回",
         ]
         
@@ -108,6 +114,8 @@ def show_leaderboard(stdscr):
             _display_leaderboard(stdscr, score_manager, "infinite")
         elif key == ord('2'):
             _display_leaderboard(stdscr, score_manager, "timed")
+        elif key == ord('3'):
+            _display_leaderboard(stdscr, score_manager, "challenge")
         else:
             return
 
@@ -120,6 +128,9 @@ def _display_leaderboard(stdscr, score_manager, mode):
     
     if mode == "infinite":
         title = "无限模式排行榜"
+        header = "排名  分数    日期"
+    elif mode == "challenge":
+        title = "挑战模式排行榜"
         header = "排名  分数    日期"
     else:
         title = "限时模式排行榜"
@@ -136,7 +147,7 @@ def _display_leaderboard(stdscr, score_manager, mode):
         lines.append("暂无记录")
     else:
         for i, record in enumerate(top_scores, 1):
-            if mode == "infinite":
+            if mode == "infinite" or mode == "challenge":
                 line = f" {i:<4} {record.score:<6} {record.timestamp}"
             else:
                 line = f" {i:<4} {record.score:<6} {record.max_combo:<6} {record.timestamp}"
@@ -164,6 +175,7 @@ def select_mode(stdscr):
             "",
             "[1] 无限模式",
             "[2] 限时模式",
+            "[3] 挑战模式",
             "[R] 规则说明",
             "[L] 排行榜",
             "[Q] 退出游戏",
@@ -183,6 +195,8 @@ def select_mode(stdscr):
             return GameMode.INFINITE
         elif key == ord('2'):
             return GameMode.TIMED
+        elif key == ord('3'):
+            return GameMode.CHALLENGE
         elif key == ord('r') or key == ord('R'):
             show_rules(stdscr)
         elif key == ord('l') or key == ord('L'):
@@ -240,6 +254,10 @@ def run_game(stdscr, game_mode):
             if board.time_remaining <= 0:
                 board.game_over = True
         
+        if game_mode == GameMode.CHALLENGE:
+            current_time = time.time()
+            board.update_falling_tiles(current_time)
+        
         key = handler.get_key()
         if key == ord('q') or key == ord('Q'):
             break
@@ -266,12 +284,18 @@ def run_game(stdscr, game_mode):
         safe_addstr(stdscr, center_y + 1, 0, f"Final Score: {board.score}")
         safe_addstr(stdscr, center_y + 3, 0, "按 R 重新开始，按 Q 退出")
         score_manager.add_score(board.score, "infinite")
-    else:
+    elif game_mode == GameMode.TIMED:
         safe_addstr(stdscr, center_y, 0, "Time's Up!")
         safe_addstr(stdscr, center_y + 1, 0, f"Final Score: {board.score}")
         safe_addstr(stdscr, center_y + 2, 0, f"Max Combo: {board.max_combo}")
         safe_addstr(stdscr, center_y + 4, 0, "按 R 重新开始，按 Q 退出")
         score_manager.add_score(board.score, "timed", board.max_combo)
+    elif game_mode == GameMode.CHALLENGE:
+        safe_addstr(stdscr, center_y, 0, "Game Over!")
+        safe_addstr(stdscr, center_y + 1, 0, f"Final Score: {board.score}")
+        safe_addstr(stdscr, center_y + 2, 0, f"Speed Level: {board.get_speed_level()}")
+        safe_addstr(stdscr, center_y + 4, 0, "按 R 重新开始，按 Q 退出")
+        score_manager.add_score(board.score, "challenge")
     
     stdscr.nodelay(False)
     while True:

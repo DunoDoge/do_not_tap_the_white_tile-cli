@@ -1,4 +1,5 @@
 import random
+import time
 from game_mode import GameMode, ComboLevel, GameConfig
 
 
@@ -23,6 +24,10 @@ class Board:
         self.time_remaining = GameConfig.TIMED_MODE_DURATION
         self.show_mistake = False
         self.sound_manager = sound_manager
+        self.falling_tiles = []
+        self.current_speed = GameConfig.CHALLENGE_INITIAL_SPEED
+        self.last_fall_time = time.time()
+        self.last_spawn_time = time.time()
         self.calculate_layout()
         self._init_board()
 
@@ -45,13 +50,39 @@ class Board:
         self.calculate_layout()
 
     def _init_board(self):
-        for row in range(self.HEIGHT):
-            self._generate_row_at(row)
+        if self.game_mode == GameMode.CHALLENGE:
+            self.grid = [[0] * self.WIDTH for _ in range(self.HEIGHT)]
+        else:
+            for row in range(self.HEIGHT):
+                self._generate_row_at(row)
 
     def _generate_row_at(self, row):
         black_col = random.randint(0, self.WIDTH - 1)
         for col in range(self.WIDTH):
             self.grid[row][col] = 1 if col == black_col else 0
+
+    def spawn_tile(self):
+        self._generate_row_at(0)
+        self.last_spawn_time = time.time()
+
+    def update_falling_tiles(self, current_time):
+        if current_time - self.last_fall_time >= self.current_speed:
+            for col in range(self.WIDTH):
+                if self.grid[self.HEIGHT - 1][col] == 1:
+                    self.game_over = True
+                    return
+            for row in range(self.HEIGHT - 1, 0, -1):
+                for col in range(self.WIDTH):
+                    self.grid[row][col] = self.grid[row - 1][col]
+            for col in range(self.WIDTH):
+                if self.grid[0][col] == 1:
+                    self.grid[0][col] = 0
+            self._generate_row_at(0)
+            self.last_fall_time = current_time
+
+    def update_speed(self):
+        new_speed = GameConfig.CHALLENGE_INITIAL_SPEED - self.score * GameConfig.CHALLENGE_SPEED_INCREMENT
+        self.current_speed = max(new_speed, GameConfig.CHALLENGE_MIN_SPEED)
 
     def get_combo_level(self, combo_count):
         if combo_count >= 50:
@@ -71,7 +102,35 @@ class Board:
             return False
 
         bottom_row = self.HEIGHT - 1
-        if self.grid[bottom_row][col] == 1:
+        if self.game_mode == GameMode.CHALLENGE:
+            closest_row = -1
+            closest_col = -1
+            for row in range(self.HEIGHT - 1, -1, -1):
+                for c in range(self.WIDTH):
+                    if self.grid[row][c] == 1:
+                        closest_row = row
+                        closest_col = c
+                        break
+                if closest_row != -1:
+                    break
+            if closest_row == -1:
+                self.game_over = True
+                if self.sound_manager:
+                    self.sound_manager.play_error_sound()
+                return False
+            if closest_col == col:
+                self.score += 1
+                self.grid[closest_row][closest_col] = 0
+                self.update_speed()
+                if self.sound_manager:
+                    self.sound_manager.play_piano_note()
+                return True
+            else:
+                self.game_over = True
+                if self.sound_manager:
+                    self.sound_manager.play_error_sound()
+                return False
+        elif self.grid[bottom_row][col] == 1:
             if self.game_mode == GameMode.INFINITE:
                 self.score += 1
             else:
@@ -104,6 +163,33 @@ class Board:
             for col in range(self.WIDTH):
                 self.grid[row][col] = self.grid[row - 1][col]
 
+    def get_speed_level(self):
+        speed_range = GameConfig.CHALLENGE_INITIAL_SPEED - GameConfig.CHALLENGE_MIN_SPEED
+        current_position = GameConfig.CHALLENGE_INITIAL_SPEED - self.current_speed
+        if speed_range <= 0:
+            return "Lv.1"
+        percentage = current_position / speed_range
+        if percentage >= 0.9:
+            return "Lv.10"
+        elif percentage >= 0.8:
+            return "Lv.9"
+        elif percentage >= 0.7:
+            return "Lv.8"
+        elif percentage >= 0.6:
+            return "Lv.7"
+        elif percentage >= 0.5:
+            return "Lv.6"
+        elif percentage >= 0.4:
+            return "Lv.5"
+        elif percentage >= 0.3:
+            return "Lv.4"
+        elif percentage >= 0.2:
+            return "Lv.3"
+        elif percentage >= 0.1:
+            return "Lv.2"
+        else:
+            return "Lv.1"
+
     def render(self):
         lines = []
         cw = self.column_width
@@ -132,6 +218,9 @@ class Board:
 
         if self.game_mode == GameMode.INFINITE:
             lines.append(f"Score: {self.score}")
+        elif self.game_mode == GameMode.CHALLENGE:
+            speed_level = self.get_speed_level()
+            lines.append(f"Score: {self.score}  Speed: {speed_level}")
         else:
             combo_level_name = self.combo_level.name.capitalize()
             status = f"Score: {self.score}  Combo: {self.combo} ({combo_level_name})  Time: {self.time_remaining}s"
