@@ -50,6 +50,34 @@ def draw_centered_lines(stdscr, lines, start_y=None):
                 pass
 
 
+def show_pause_menu(stdscr):
+    stdscr.clear()
+    height, width = stdscr.getmaxyx()
+    
+    pause_lines = [
+        "========== 游戏暂停 ==========",
+        "",
+        "按 [空格] 继续游戏",
+        "按 [R] 重新开始",
+        "按 [Esc] 返回主菜单",
+        "",
+        "========== 游戏暂停 ==========",
+    ]
+    
+    draw_centered_lines(stdscr, pause_lines)
+    stdscr.refresh()
+    
+    stdscr.nodelay(False)
+    while True:
+        key = stdscr.getch()
+        if key == ord(' '):
+            return 'resume'
+        elif key == ord('r') or key == ord('R'):
+            return 'restart'
+        elif key == 27:
+            return 'menu'
+
+
 def show_rules(stdscr):
     stdscr.clear()
     height, width = stdscr.getmaxyx()
@@ -62,6 +90,7 @@ def show_rules(stdscr):
         "  F - 点击第二列",
         "  J - 点击第三列",
         "  K - 点击第四列",
+        "  Esc - 暂停游戏",
         "",
         "【无限模式】",
         " 点击黑块得分",
@@ -227,6 +256,8 @@ def run_game(stdscr, game_mode):
     board = Board(game_mode, height, width, sound_manager)
     handler = InputHandler(stdscr)
     start_time = time.time()
+    total_pause_time = 0
+    pause_start_time = None
     
     while not board.game_over:
         height, width = stdscr.getmaxyx()
@@ -250,7 +281,7 @@ def run_game(stdscr, game_mode):
             continue
         
         if game_mode == GameMode.TIMED:
-            board.time_remaining = max(0, GameConfig.TIMED_MODE_DURATION - int(time.time() - start_time))
+            board.time_remaining = max(0, GameConfig.TIMED_MODE_DURATION - int(time.time() - start_time - total_pause_time))
             if board.time_remaining <= 0:
                 board.game_over = True
         
@@ -261,6 +292,20 @@ def run_game(stdscr, game_mode):
         key = handler.get_key()
         if key == ord('q') or key == ord('Q'):
             break
+        
+        if key == 27:
+            pause_start_time = time.time()
+            action = show_pause_menu(stdscr)
+            pause_end_time = time.time()
+            total_pause_time += (pause_end_time - pause_start_time)
+            
+            if action == 'resume':
+                board.last_fall_time = time.time()
+                continue
+            elif action == 'restart':
+                return True
+            elif action == 'menu':
+                return False
         
         if key == curses.KEY_RESIZE:
             height, width = stdscr.getmaxyx()
@@ -315,8 +360,10 @@ def main(stdscr):
         if game_mode is None:
             break
         
-        if not run_game(stdscr, game_mode):
-            break
+        while True:
+            should_restart = run_game(stdscr, game_mode)
+            if not should_restart:
+                break
 
 
 if __name__ == "__main__":
