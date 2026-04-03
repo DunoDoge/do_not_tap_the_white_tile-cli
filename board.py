@@ -1,20 +1,20 @@
 import random
 import time
-from game_mode import GameMode, ComboLevel, GameConfig
+from game_mode import GameMode, ComboLevel, GameConfig, GameSettings
 
 
 class Board:
-    WIDTH = 4
-    HEIGHT = 8
     MIN_WIDTH = 20
     MIN_HEIGHT = 15
 
-    def __init__(self, game_mode=GameMode.INFINITE, window_height=24, window_width=40, sound_manager=None):
+    def __init__(self, game_mode=GameMode.INFINITE, window_height=24, window_width=40, sound_manager=None, key_count=4, row_count=8):
         self.window_height = window_height
         self.window_width = window_width
+        self.key_count = key_count
+        self.row_count = row_count
         self.column_width = 4
-        self.visible_rows = 8
-        self.grid = [[0] * self.WIDTH for _ in range(self.HEIGHT)]
+        self.visible_rows = row_count
+        self.grid = [[0] * key_count for _ in range(row_count)]
         self.score = 0
         self.game_over = False
         self.game_mode = game_mode
@@ -32,14 +32,15 @@ class Board:
         self._init_board()
 
     def calculate_layout(self):
-        self.column_width = max(2, (self.window_width - 5) // 4)
-        self.visible_rows = 8
-        self.row_height = max(1, (self.window_height - 13) // 8)
+        self.column_width = max(2, (self.window_width - 5) // self.key_count)
+        self.visible_rows = self.row_count
+        self.row_height = max(1, (self.window_height - 13) // self.row_count)
 
     def is_window_too_small(self):
-        is_too_small = self.window_width < self.MIN_WIDTH or self.window_height < self.MIN_HEIGHT
+        min_width_needed = self.key_count * 2 + 5
+        is_too_small = self.window_width < min_width_needed or self.window_height < self.MIN_HEIGHT
         if is_too_small:
-            message = f"窗口太小！最小尺寸: {self.MIN_WIDTH}x{self.MIN_HEIGHT}，当前: {self.window_width}x{self.window_height}"
+            message = f"窗口太小！最小尺寸: {min_width_needed}x{self.MIN_HEIGHT}，当前: {self.window_width}x{self.window_height}"
         else:
             message = ""
         return (is_too_small, message)
@@ -51,14 +52,14 @@ class Board:
 
     def _init_board(self):
         if self.game_mode == GameMode.CHALLENGE:
-            self.grid = [[0] * self.WIDTH for _ in range(self.HEIGHT)]
+            self.grid = [[0] * self.key_count for _ in range(self.row_count)]
         else:
-            for row in range(self.HEIGHT):
+            for row in range(self.row_count):
                 self._generate_row_at(row)
 
     def _generate_row_at(self, row):
-        black_col = random.randint(0, self.WIDTH - 1)
-        for col in range(self.WIDTH):
+        black_col = random.randint(0, self.key_count - 1)
+        for col in range(self.key_count):
             self.grid[row][col] = 1 if col == black_col else 0
 
     def spawn_tile(self):
@@ -67,14 +68,14 @@ class Board:
 
     def update_falling_tiles(self, current_time):
         if current_time - self.last_fall_time >= self.current_speed:
-            for col in range(self.WIDTH):
-                if self.grid[self.HEIGHT - 1][col] == 1:
+            for col in range(self.key_count):
+                if self.grid[self.row_count - 1][col] == 1:
                     self.game_over = True
                     return
-            for row in range(self.HEIGHT - 1, 0, -1):
-                for col in range(self.WIDTH):
+            for row in range(self.row_count - 1, 0, -1):
+                for col in range(self.key_count):
                     self.grid[row][col] = self.grid[row - 1][col]
-            for col in range(self.WIDTH):
+            for col in range(self.key_count):
                 if self.grid[0][col] == 1:
                     self.grid[0][col] = 0
             self._generate_row_at(0)
@@ -98,20 +99,22 @@ class Board:
         return GameConfig.COMBO_MULTIPLIERS[self.combo_level]
 
     def tap_column(self, col):
-        if col < 0 or col >= self.WIDTH:
+        if col < 0 or col >= self.key_count:
             return False
 
-        bottom_row = self.HEIGHT - 1
+        bottom_row = self.row_count - 1
         if self.game_mode == GameMode.CHALLENGE:
             closest_row = -1
             closest_col = -1
-            for row in range(self.HEIGHT - 1, -1, -1):
-                for c in range(self.WIDTH):
+            found = False
+            for row in range(self.row_count - 1, -1, -1):
+                for c in range(self.key_count):
                     if self.grid[row][c] == 1:
                         closest_row = row
                         closest_col = c
+                        found = True
                         break
-                if closest_row != -1:
+                if found:
                     break
             if closest_row == -1:
                 self.game_over = True
@@ -159,8 +162,8 @@ class Board:
             return False
 
     def _shift_down(self):
-        for row in range(self.HEIGHT - 1, 0, -1):
-            for col in range(self.WIDTH):
+        for row in range(self.row_count - 1, 0, -1):
+            for col in range(self.key_count):
                 self.grid[row][col] = self.grid[row - 1][col]
 
     def get_speed_level(self):
@@ -194,17 +197,18 @@ class Board:
         lines = []
         cw = self.column_width
         rh = self.row_height
-        border = "+" + "+".join(["-" * cw] * self.WIDTH) + "+"
+        border = "+" + "+".join(["-" * cw] * self.key_count) + "+"
         black_block = "█" * cw
         empty_block = " " * cw
-        keys = ["D", "F", "J", "K"]
+        settings = GameSettings(key_count=self.key_count)
+        keys = settings.get_keys()
 
         lines.append(border)
 
-        for row in range(self.HEIGHT):
+        for row in range(self.row_count):
             for _ in range(rh):
                 row_display = []
-                for col in range(self.WIDTH):
+                for col in range(self.key_count):
                     if self.grid[row][col] == 1:
                         row_display.append(black_block)
                     else:

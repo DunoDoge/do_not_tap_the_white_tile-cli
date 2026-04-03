@@ -2,7 +2,7 @@ import curses
 import time
 from board import Board
 from player import InputHandler
-from game_mode import GameMode, GameConfig
+from game_mode import GameMode, GameConfig, GameSettings
 from sound_manager import SoundManager
 from score_manager import ScoreManager
 
@@ -86,11 +86,13 @@ def show_rules(stdscr):
         "========== 游戏规则 ==========",
         "",
         "【基本操作】",
-        "  D - 点击第一列",
-        "  F - 点击第二列",
-        "  J - 点击第三列",
-        "  K - 点击第四列",
+        "  四键模式: D F J K",
+        "  六键模式: S D F J K L",
         "  Esc - 暂停游戏",
+        "",
+        "【自定义设置】",
+        "  可在主菜单选择键数（四键/六键）",
+        "  可调整谱面行数（8-12行）",
         "",
         "【无限模式】",
         " 点击黑块得分",
@@ -193,18 +195,91 @@ def _display_leaderboard(stdscr, score_manager, mode):
     stdscr.getch()
 
 
-def select_mode(stdscr):
+def show_settings_menu(stdscr, settings):
+    while True:
+        stdscr.clear()
+        height, width = stdscr.getmaxyx()
+        
+        key_mode_name = "四键模式" if settings.key_count == 4 else "六键模式"
+        
+        settings_lines = [
+            "========== 游戏设置 ==========",
+            "",
+            f"[K] 键数: {key_mode_name} ({'/'.join(settings.get_keys())})",
+            f"[R] 行数: {settings.row_count} 行",
+            "",
+            "提示: 行数范围 8-12",
+            "",
+            "========== 游戏设置 ==========",
+            "按其他键返回...",
+        ]
+        
+        draw_centered_lines(stdscr, settings_lines)
+        stdscr.refresh()
+        
+        stdscr.nodelay(False)
+        key = stdscr.getch()
+        
+        if key == ord('k') or key == ord('K'):
+            if settings.key_count == 4:
+                settings.key_count = 6
+            else:
+                settings.key_count = 4
+        elif key == ord('r') or key == ord('R'):
+            new_row_count = _select_row_count(stdscr, settings.row_count)
+            if new_row_count is not None:
+                settings.row_count = new_row_count
+        else:
+            return
+
+
+def _select_row_count(stdscr, current_count):
+    stdscr.clear()
+    height, width = stdscr.getmaxyx()
+    
+    row_options = [8, 9, 10, 11, 12]
+    
+    lines = [
+        "========== 选择行数 ==========",
+        "",
+    ]
+    
+    for i, row_count in enumerate(row_options, 1):
+        marker = " <--" if row_count == current_count else ""
+        lines.append(f"[{i}] {row_count} 行{marker}")
+    
+    lines.append("")
+    lines.append("========== 选择行数 ==========")
+    lines.append("按其他键取消...")
+    
+    draw_centered_lines(stdscr, lines)
+    stdscr.refresh()
+    
+    stdscr.nodelay(False)
+    key = stdscr.getch()
+    
+    if key >= ord('1') and key <= ord('5'):
+        index = key - ord('1')
+        return row_options[index]
+    return None
+
+
+def select_mode(stdscr, settings):
     curses.curs_set(0)
     
     while True:
         stdscr.clear()
         height, width = stdscr.getmaxyx()
         
+        key_mode_name = "4键" if settings.key_count == 4 else "6键"
+        
         menu_lines = [
             "",
-            "[1] 无限模式",
-            "[2] 限时模式",
-            "[3] 挑战模式",
+            f"[1] 无限模式",
+            f"[2] 限时模式",
+            f"[3] 挑战模式",
+            "",
+            f"[S] 游戏设置",
             "[R] 规则说明",
             "[L] 排行榜",
             "[Q] 退出游戏",
@@ -226,6 +301,8 @@ def select_mode(stdscr):
             return GameMode.TIMED
         elif key == ord('3'):
             return GameMode.CHALLENGE
+        elif key == ord('s') or key == ord('S'):
+            show_settings_menu(stdscr, settings)
         elif key == ord('r') or key == ord('R'):
             show_rules(stdscr)
         elif key == ord('l') or key == ord('L'):
@@ -249,12 +326,12 @@ def safe_addstr(stdscr, y, x, text):
         pass
 
 
-def run_game(stdscr, game_mode):
+def run_game(stdscr, game_mode, settings):
     height, width = stdscr.getmaxyx()
     sound_manager = SoundManager()
     score_manager = ScoreManager()
-    board = Board(game_mode, height, width, sound_manager)
-    handler = InputHandler(stdscr)
+    board = Board(game_mode, height, width, sound_manager, settings.key_count, settings.row_count)
+    handler = InputHandler(stdscr, settings.key_count)
     start_time = time.time()
     total_pause_time = 0
     pause_start_time = None
@@ -360,14 +437,15 @@ def run_game(stdscr, game_mode):
 def main(stdscr):
     curses.curs_set(0)
     stdscr.clear()
+    settings = GameSettings()
     
     while True:
-        game_mode = select_mode(stdscr)
+        game_mode = select_mode(stdscr, settings)
         if game_mode is None:
             break
         
         while True:
-            should_restart = run_game(stdscr, game_mode)
+            should_restart = run_game(stdscr, game_mode, settings)
             if not should_restart:
                 break
 

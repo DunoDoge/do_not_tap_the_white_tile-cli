@@ -2,15 +2,21 @@ import curses
 
 
 class InputHandler:
-    KEY_MAP = {
-        ord('d'): 0, ord('D'): 0,
-        ord('f'): 1, ord('F'): 1,
-        ord('j'): 2, ord('J'): 2,
-        ord('k'): 3, ord('K'): 3,
-    }
-
-    def __init__(self, stdscr):
+    def __init__(self, stdscr, key_count=4):
         self.stdscr = stdscr
+        self.key_count = key_count
+        self._build_key_map()
+
+    def _build_key_map(self):
+        self.KEY_MAP = {}
+        if self.key_count == 4:
+            keys = ['d', 'f', 'j', 'k']
+        else:
+            keys = ['s', 'd', 'f', 'j', 'k', 'l']
+        
+        for i, key in enumerate(keys):
+            self.KEY_MAP[ord(key)] = i
+            self.KEY_MAP[ord(key.upper())] = i
 
     def get_key(self):
         self.stdscr.nodelay(True)
