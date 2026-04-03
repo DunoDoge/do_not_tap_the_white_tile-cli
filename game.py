@@ -272,8 +272,16 @@ def run_game(stdscr, game_mode):
         
         if is_too_small:
             key = stdscr.getch()
-            if key == ord('q') or key == ord('Q'):
-                break
+            if key == 27:
+                pause_start_time = time.time()
+                action = show_pause_menu(stdscr)
+                pause_end_time = time.time()
+                total_pause_time += (pause_end_time - pause_start_time)
+                
+                if action == 'restart':
+                    return True
+                elif action == 'menu':
+                    return False
             if key == curses.KEY_RESIZE:
                 height, width = stdscr.getmaxyx()
                 board.update_window_size(height, width)
@@ -290,8 +298,6 @@ def run_game(stdscr, game_mode):
             board.update_falling_tiles(current_time)
         
         key = handler.get_key()
-        if key == ord('q') or key == ord('Q'):
-            break
         
         if key == 27:
             pause_start_time = time.time()
